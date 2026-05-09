@@ -1,0 +1,7 @@
+# Tell GitHub to ignore platform runner code in language statistics
+windows/** linguist-vendored
+linux/** linguist-vendored
+macos/** linguist-vendored
+android/** linguist-vendored
+ios/** linguist-vendored
+web/** linguist-vendored
