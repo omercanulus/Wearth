@@ -70,6 +70,13 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
           }
         }
       });
+      
+      // Eğer oyun önceden bitmişse popup'ı göster
+      if (_gameState.isGameOver) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) _showGameOverDialog(stats);
+        });
+      }
     }
   }
 
@@ -151,12 +158,12 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
         });
         
         // Popup şeklinde tebrikler / oyun bitti mesajını göster
-        _showGameOverDialog();
+        _showGameOverDialog(stats);
       }
     }
   }
 
-  void _showGameOverDialog() {
+  void _showGameOverDialog(GameStats stats) {
     showDialog(
       context: context,
       barrierDismissible: true, // Kullanıcı dışarı tıklayarak kapatabilsin
@@ -165,7 +172,7 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           insetPadding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _buildGameOverBanner(),
+          child: _buildGameOverBanner(stats),
         );
       },
     );
@@ -427,24 +434,59 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
     );
   }
 
-  /// Oyun bitti bildirimi
-  Widget _buildGameOverBanner() {
+  /// İstatistik öğesi (Küçük kutular)
+  Widget _buildStatItem(String title, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: context.wearth.textPrimary,
+          ),
+        ),
+        Text(
+          title,
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: context.wearth.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  /// Oyun bitti bildirimi (Modal içerik)
+  Widget _buildGameOverBanner(GameStats stats) {
     final won = _gameState.status == GameStatus.won;
+    
+    // Ortalama deneme hesaplama
+    double avgAttempts = 0.0;
+    if (stats.gamesWon > 0) {
+      int total = 0;
+      for (int i = 0; i < stats.guessDistribution.length; i++) {
+        total += (i + 1) * stats.guessDistribution[i];
+      }
+      avgAttempts = total / stats.gamesWon;
+    }
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
             decoration: BoxDecoration(
               color: context.wearth.glassBackgroundStrong,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: (won ? const Color(0xFF4CAF50) : const Color(0xFFEF4444))
-                    .withAlpha(60),
-                width: 0.5,
+                color: context.wearth.glassBorder,
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
@@ -458,52 +500,101 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
               ],
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  won ? Icons.celebration_rounded : Icons.sentiment_dissatisfied_rounded,
-                  size: 36,
-                  color: won
-                      ? const Color(0xFF4CAF50)
-                      : const Color(0xFFEF4444),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  won
-                      ? _l10n.t('congratulations')
-                      : _l10n.t('gameOver'),
-                  style: GoogleFonts.outfit(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: won
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFB71C1C),
+                // Çarpı butonu
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: context.wearth.tileEmpty,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.close, size: 20, color: context.wearth.textPrimary),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                if (won)
+                
+                // Seri (Streak) Gösterimi
+                if (stats.currentStreak > 0)
+                  SizedBox(
+                    height: 110,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/streak_image.png',
+                          height: 110,
+                          fit: BoxFit.contain,
+                        ),
+                        Align(
+                          alignment: const Alignment(0.0, 0.35),
+                          child: Text(
+                            '${stats.currentStreak}',
+                            style: GoogleFonts.bungee(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 42,
+                              color: context.isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
                   Text(
-                    '${_l10n.t('attempt')}: ${_gameState.currentAttempt}/6',
+                    'Serini başlatmak için yarın tekrar gel!',
                     style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                       color: context.wearth.textMuted,
                     ),
                   ),
+                
+                const SizedBox(height: 24),
+
+                // İstatistikler Grid
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatItem('Oyun', '${stats.gamesPlayed}'),
+                    _buildStatItem('Başarı', '${stats.winPercentage.toStringAsFixed(0)}%'),
+                    _buildStatItem('Seri', '${stats.maxStreak}'),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatItem('Bugün', won ? '${_gameState.currentAttempt}' : 'X'),
+                    _buildStatItem('Ortalama', avgAttempts > 0 ? avgAttempts.toStringAsFixed(1) : '-'),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Ana Tebrik / Kaybetme Mesajı
+                Text(
+                  won ? _l10n.t('congratulations') : _l10n.t('gameOver'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: won ? const Color(0xFF4CAF50) : const Color(0xFFEF4444),
+                  ),
+                ),
                 if (!won) ...[
+                  const SizedBox(height: 8),
                   Text(
                     '${_l10n.t('correctWord')} ${_gameState.targetWord}',
                     style: GoogleFonts.outfit(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: context.wearth.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _l10n.t('tryAgainTomorrow'),
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: context.wearth.textMuted,
                     ),
                   ),
                 ],
