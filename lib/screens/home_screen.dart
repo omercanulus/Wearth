@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import '../l10n/app_localizations.dart';
+import '../theme/app_theme.dart';
+import '../services/storage_service.dart';
+import '../main.dart';
+import 'daily_game_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.wearth.scaffoldBg,
       body: Stack(
         children: [
           // Main content
@@ -121,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           _l10n.t('version'),
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            color: const Color(0xFFBDBDBD),
+                            color: context.wearth.textVersion,
                           ),
                         ),
 
@@ -162,6 +166,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 _buildPremiumButton(),
                 const SizedBox(height: 8),
                 _buildSettingsIconButton(),
+                const SizedBox(height: 8),
+                _buildThemeToggleButton(),
               ],
             ),
           ),
@@ -205,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(140),
+              color: context.wearth.glassBackground,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: const Color(0xFFFFC107).withAlpha(60),
@@ -275,25 +281,69 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(140),
+              color: context.wearth.glassBackground,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: const Color(0xFF9CA3AF).withAlpha(40),
+                color: context.wearth.settingsBorder,
                 width: 0.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(8),
+                  color: context.wearth.glassShadow,
                   blurRadius: 12,
                   spreadRadius: 0,
                   offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.settings_rounded,
               size: 20,
-              color: Color(0xFF6B7280),
+              color: context.wearth.settingsIcon,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Liquid glass theme toggle icon button
+  Widget _buildThemeToggleButton() {
+    final isDark = context.isDark;
+    
+    return GestureDetector(
+      onTap: () {
+        final newMode = isDark ? ThemeMode.light : ThemeMode.dark;
+        themeNotifier.value = newMode;
+        StorageService().saveThemeMode(isDark ? 'light' : 'dark');
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: context.wearth.glassBackground,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: context.wearth.settingsBorder,
+                width: 0.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: context.wearth.glassShadow,
+                  blurRadius: 12,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              size: 20,
+              color: context.wearth.settingsIcon,
             ),
           ),
         ),
@@ -313,7 +363,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(_isLanguageMenuOpen ? 180 : 140),
+              color: _isLanguageMenuOpen
+                  ? context.wearth.glassBackgroundStrong
+                  : context.wearth.glassBackground,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: const Color(0xFF2196F3).withAlpha(_isLanguageMenuOpen ? 80 : 50),
@@ -381,15 +433,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Container(
               width: 180,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(200),
+                color: context.wearth.menuBackground,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: Colors.white.withAlpha(220),
+                  color: context.wearth.menuBorder,
                   width: 0.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(15),
+                    color: context.wearth.glassShadow,
                     blurRadius: 24,
                     spreadRadius: 0,
                     offset: const Offset(0, 8),
@@ -437,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     : FontWeight.w500,
                                 color: isSelected
                                     ? const Color(0xFF1E88E5)
-                                    : const Color(0xFF374151),
+                                    : context.wearth.textPrimary,
                               ),
                             ),
                           ),
@@ -473,7 +525,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(140),
+              color: context.wearth.glassBackground,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: const Color(0xFF4CAF50).withAlpha(50),
@@ -555,7 +607,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: GestureDetector(
         onTap: () {
-          // TODO: Navigate to word of the day screen
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const DailyGameScreen(),
+            ),
+          );
         },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(22),
@@ -565,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               height: 72,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(140),
+                color: context.wearth.glassBackground,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: const Color(0xFFFFC107).withAlpha(60),
@@ -624,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             height: 72,
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(140),
+              color: context.wearth.glassBackground,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: accentColor.withAlpha(60),
@@ -686,15 +742,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             height: 72,
             decoration: BoxDecoration(
               // Translucent white glass background
-              color: Colors.white.withAlpha(160),
+              color: context.wearth.glassBackgroundStrong,
               borderRadius: BorderRadius.circular(40),
               border: Border.all(
-                color: Colors.white.withAlpha(200),
+                color: context.wearth.glassBorder,
                 width: 0.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(15),
+                  color: context.wearth.glassShadow,
                   blurRadius: 20,
                   spreadRadius: 0,
                   offset: const Offset(0, 4),
@@ -747,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 : FontWeight.w400,
                             color: isSelected
                                 ? const Color(0xFF4CAF50)
-                                : const Color(0xFF9CA3AF),
+                                : context.wearth.navUnselected,
                           ),
                         ),
                       ],

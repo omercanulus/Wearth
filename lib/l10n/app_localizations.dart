@@ -73,6 +73,20 @@ class AppLocalizations {
       'getPremium': 'Premium Ol',
       'removeAds': 'Reklamları Kaldır',
 
+      // Game Screen
+      'dailyWordTitle': 'Günün Kelimesi',
+      'enterGuess': 'Tahmininizi girin',
+      'notEnoughLetters': 'Yeterli harf yok',
+      'invalidWord': 'Geçersiz kelime',
+      'congratulations': 'Tebrikler!',
+      'gameOver': 'Oyun Bitti',
+      'correctWord': 'Doğru kelime:',
+      'tryAgainTomorrow': 'Yarın tekrar deneyin!',
+      'attempt': 'Deneme',
+      'submit': 'GİR',
+      'delete': 'SİL',
+      'streakMotivation': 'Serini başlatmak için kelimeyi bul! 🔥',
+
       // Language
       'language': 'Dil',
       'turkish': 'Türkçe',
@@ -95,6 +109,20 @@ class AppLocalizations {
       'home': 'Home',
       'getPremium': 'Get Premium',
       'removeAds': 'Remove Ads',
+
+      // Game Screen
+      'dailyWordTitle': 'Word of the Day',
+      'enterGuess': 'Enter your guess',
+      'notEnoughLetters': 'Not enough letters',
+      'invalidWord': 'Invalid word',
+      'congratulations': 'Congratulations!',
+      'gameOver': 'Game Over',
+      'correctWord': 'Correct word:',
+      'tryAgainTomorrow': 'Try again tomorrow!',
+      'attempt': 'Attempt',
+      'submit': 'ENTER',
+      'delete': 'DEL',
+      'streakMotivation': 'Find the word to start your streak! 🔥',
 
       // Language
       'language': 'Language',
