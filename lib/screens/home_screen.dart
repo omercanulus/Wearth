@@ -10,9 +10,51 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final AppLocalizations _l10n = AppLocalizations();
   int _currentNavIndex = 0;
+  bool _isLanguageMenuOpen = false;
+  late AnimationController _languageMenuController;
+  late Animation<double> _languageMenuAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _languageMenuController = AnimationController(
+      duration: const Duration(milliseconds: 280),
+      vsync: this,
+    );
+    _languageMenuAnimation = CurvedAnimation(
+      parent: _languageMenuController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _languageMenuController.dispose();
+    super.dispose();
+  }
+
+  void _toggleLanguageMenu() {
+    setState(() {
+      _isLanguageMenuOpen = !_isLanguageMenuOpen;
+    });
+    if (_isLanguageMenuOpen) {
+      _languageMenuController.forward();
+    } else {
+      _languageMenuController.reverse();
+    }
+  }
+
+  void _selectLanguage(String localeCode) {
+    setState(() {
+      _l10n.setLocale(localeCode);
+      _isLanguageMenuOpen = false;
+    });
+    _languageMenuController.reverse();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,19 +142,47 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _buildLanguageButton(),
+                _buildLiquidGlassLanguageButton(),
                 const SizedBox(height: 8),
-                _buildHowToPlayButton(),
+                // Language dropdown menu (animated)
+                _buildLanguageDropdown(),
+                const SizedBox(height: 8),
+                _buildLiquidGlassHowToPlayButton(),
               ],
             ),
           ),
 
-          // Top-left button: Remove Ads
+          // Top-left buttons: Premium + Settings
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
-            child: _buildRemoveAdsButton(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPremiumButton(),
+                const SizedBox(height: 8),
+                _buildSettingsIconButton(),
+              ],
+            ),
           ),
+
+          // Close language menu when tapping outside
+          if (_isLanguageMenuOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _toggleLanguageMenu,
+                behavior: HitTestBehavior.translucent,
+                child: const SizedBox.expand(),
+              ),
+            ),
+
+          // Re-position the language dropdown above the overlay detector
+          if (_isLanguageMenuOpen)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12 + 48 + 8,
+              right: 16,
+              child: _buildLanguageDropdownContent(),
+            ),
         ],
       ),
 
@@ -122,117 +192,322 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRemoveAdsButton() {
+  /// Liquid glass premium button
+  Widget _buildPremiumButton() {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to remove ads / premium screen
+        // TODO: Navigate to premium / subscription screen
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFE0E0E0),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.block_rounded,
-              size: 18,
-              color: const Color(0xFFEF4444),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _l10n.t('removeAds'),
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF374151),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(140),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFFFFC107).withAlpha(60),
+                width: 0.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFFC107).withAlpha(15),
+                  blurRadius: 16,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [
+                      Color(0xFFF59E0B),
+                      Color(0xFFEF4444),
+                      Color(0xFFF59E0B),
+                    ],
+                  ).createShader(bounds),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [
+                      Color(0xFFF59E0B),
+                      Color(0xFFEF4444),
+                    ],
+                  ).createShader(bounds),
+                  child: Text(
+                    _l10n.t('getPremium'),
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLanguageButton() {
+  /// Liquid glass settings icon button (no label)
+  Widget _buildSettingsIconButton() {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _l10n.toggleLocale();
-        });
+        // TODO: Navigate to settings screen
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFE0E0E0),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.language_rounded,
-              size: 18,
-              color: const Color(0xFF2196F3),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _l10n.currentLanguageLabel,
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF374151),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(140),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFF9CA3AF).withAlpha(40),
+                width: 0.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(8),
+                  blurRadius: 12,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-          ],
+            child: const Icon(
+              Icons.settings_rounded,
+              size: 20,
+              color: Color(0xFF6B7280),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHowToPlayButton() {
+  /// Liquid glass style language button
+  Widget _buildLiquidGlassLanguageButton() {
+    return GestureDetector(
+      onTap: _toggleLanguageMenu,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(_isLanguageMenuOpen ? 180 : 140),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFF2196F3).withAlpha(_isLanguageMenuOpen ? 80 : 50),
+                width: 0.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2196F3).withAlpha(15),
+                  blurRadius: 16,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _l10n.currentFlag,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _l10n.currentLanguageLabel,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E88E5),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                AnimatedRotation(
+                  turns: _isLanguageMenuOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 250),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: const Color(0xFF1E88E5).withAlpha(180),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Empty placeholder when dropdown is shown via overlay
+  Widget _buildLanguageDropdown() {
+    return const SizedBox.shrink();
+  }
+
+  /// Liquid glass dropdown content for language selection
+  Widget _buildLanguageDropdownContent() {
+    return FadeTransition(
+      opacity: _languageMenuAnimation,
+      child: SizeTransition(
+        sizeFactor: _languageMenuAnimation,
+        axisAlignment: -1.0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+            child: Container(
+              width: 180,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(200),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withAlpha(220),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(15),
+                    blurRadius: 24,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFF2196F3).withAlpha(8),
+                    blurRadius: 32,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: AppLocalizations.availableLocales.map((locale) {
+                  final isSelected = _l10n.currentLocale == locale['code'];
+                  return GestureDetector(
+                    onTap: () => _selectLanguage(locale['code']!),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF2196F3).withAlpha(20)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            locale['flag']!,
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              locale['name']!,
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected
+                                    ? const Color(0xFF1E88E5)
+                                    : const Color(0xFF374151),
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_rounded,
+                              size: 18,
+                              color: const Color(0xFF1E88E5),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Liquid glass style how to play button
+  Widget _buildLiquidGlassHowToPlayButton() {
     return GestureDetector(
       onTap: () {
         // TODO: Navigate to how to play screen
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFE0E0E0),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.help_outline_rounded,
-              size: 18,
-              color: const Color(0xFF4CAF50),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _l10n.t('howToPlay'),
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF374151),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(140),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFF4CAF50).withAlpha(50),
+                width: 0.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50).withAlpha(15),
+                  blurRadius: 16,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.help_outline_rounded,
+                  size: 18,
+                  color: const Color(0xFF4CAF50),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _l10n.t('howToPlay'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF4CAF50),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -390,9 +665,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildLiquidGlassNavbar() {
     final items = [
-      _NavItem(icon: Icons.person_rounded, label: _l10n.t('profile')),
+      _NavItem(icon: Icons.home_rounded, label: _l10n.t('home')),
       _NavItem(icon: Icons.leaderboard_rounded, label: _l10n.t('ranking')),
-      _NavItem(icon: Icons.settings_rounded, label: _l10n.t('settings')),
+      _NavItem(icon: Icons.person_rounded, label: _l10n.t('profile')),
     ];
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;

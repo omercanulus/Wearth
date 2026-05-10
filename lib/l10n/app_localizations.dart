@@ -11,6 +11,12 @@ class AppLocalizations {
 
   String get currentLocale => _currentLocale;
 
+  /// Desteklenen dillerin listesi
+  static const List<Map<String, String>> availableLocales = [
+    {'code': 'tr', 'name': 'Türkçe', 'flag': '🇹🇷'},
+    {'code': 'en', 'name': 'English', 'flag': '🇬🇧'},
+  ];
+
   void setLocale(String locale) {
     if (_translations.containsKey(locale)) {
       _currentLocale = locale;
@@ -27,7 +33,20 @@ class AppLocalizations {
 
   /// Mevcut dilin görünen adını döndürür (buton için)
   String get currentLanguageLabel {
-    return _currentLocale == 'tr' ? 'Turkish' : 'English';
+    final locale = availableLocales.firstWhere(
+      (l) => l['code'] == _currentLocale,
+      orElse: () => availableLocales.first,
+    );
+    return locale['name']!;
+  }
+
+  /// Mevcut dilin bayrak emojisini döndürür
+  String get currentFlag {
+    final locale = availableLocales.firstWhere(
+      (l) => l['code'] == _currentLocale,
+      orElse: () => availableLocales.first,
+    );
+    return locale['flag']!;
   }
 
   /// Diğer dilin görünen adını döndürür (geçiş bilgisi için)
@@ -50,6 +69,8 @@ class AppLocalizations {
       'ranking': 'Sıralama',
       'settings': 'Ayarlar',
       'profile': 'Profil',
+      'home': 'Anasayfa',
+      'getPremium': 'Premium Ol',
       'removeAds': 'Reklamları Kaldır',
 
       // Language
@@ -71,6 +92,8 @@ class AppLocalizations {
       'ranking': 'Ranking',
       'settings': 'Settings',
       'profile': 'Profile',
+      'home': 'Home',
+      'getPremium': 'Get Premium',
       'removeAds': 'Remove Ads',
 
       // Language
