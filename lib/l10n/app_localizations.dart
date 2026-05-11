@@ -87,6 +87,32 @@ class AppLocalizations {
       'delete': 'SİL',
       'streakMotivation': 'Serini başlatmak için kelimeyi bul! 🔥',
 
+      // Classic Map
+      'level': 'Seviye',
+      'locked': 'Kilitli',
+      'playLevel': 'Oyna',
+      'unlockedCity': 'Şehri Keşfettin!',
+      
+      // Continents
+      'europe': 'Avrupa',
+      'africa': 'Afrika',
+      'asia': 'Asya',
+      'north_america': 'Kuzey Amerika',
+      'south_america': 'Güney Amerika',
+      'oceania': 'Okyanusya',
+      'antarctica': 'Antarktika',
+      
+      // Game UI
+      'levelComplete': 'SEVİYE TAMAMLANDI!',
+      'levelFailed': 'BÖLÜM GEÇİLEMEDİ',
+      'map': 'HARİTA',
+      'next': 'SIRADAKİ',
+      'retry': 'TEKRAR DENE',
+      'noLives': 'Canın yok!',
+      'wait': 'beklemen gerekiyor.',
+      'city': 'Şehri',
+      'currentLevel': 'MEVCUT\nSEVİYE',
+
       // Language
       'language': 'Dil',
       'turkish': 'Türkçe',
@@ -123,6 +149,32 @@ class AppLocalizations {
       'submit': 'ENTER',
       'delete': 'DEL',
       'streakMotivation': 'Find the word to start your streak! 🔥',
+
+      // Classic Map
+      'level': 'Level',
+      'locked': 'Locked',
+      'playLevel': 'Play',
+      'unlockedCity': 'City Unlocked!',
+      
+      // Continents
+      'europe': 'Europe',
+      'africa': 'Africa',
+      'asia': 'Asia',
+      'north_america': 'North America',
+      'south_america': 'South America',
+      'oceania': 'Oceania',
+      'antarctica': 'Antarctica',
+      
+      // Game UI
+      'levelComplete': 'LEVEL COMPLETE!',
+      'levelFailed': 'LEVEL FAILED',
+      'map': 'MAP',
+      'next': 'NEXT',
+      'retry': 'RETRY',
+      'noLives': 'No lives!',
+      'wait': 'to wait.',
+      'city': 'City',
+      'currentLevel': 'CURRENT\nLEVEL',
 
       // Language
       'language': 'Language',

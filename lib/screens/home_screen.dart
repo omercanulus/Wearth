@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../services/storage_service.dart';
 import '../main.dart';
 import 'daily_game_screen.dart';
+import 'classic_map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -579,7 +580,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               label: _l10n.t('classicMode'),
               accentColor: const Color(0xFF4CAF50),
               onTap: () {
-                // TODO: Navigate to classic game screen
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ClassicMapScreen(),
+                  ),
+                );
               },
             ),
           ),

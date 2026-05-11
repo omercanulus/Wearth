@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/word_service.dart';
 import 'services/storage_service.dart';
+import 'services/life_service.dart';
 import 'theme/app_theme.dart';
 
 // Global tema notifier
@@ -13,6 +14,7 @@ void main() async {
   // Servisleri başlat
   await StorageService().init();
   await WordService().loadAllWords();
+  await LifeService().init();
 
   // Kayıtlı temayı yükle
   final savedTheme = await StorageService().loadThemeMode();

@@ -12,6 +12,10 @@ class WordService {
 
   /// Dile göre çözüm kelimeleri (günlük + seviye kelimeleri)
   final Map<String, List<String>> _solutionWords = {};
+  
+  final Map<String, List<String>> _easyWords = {};
+  final Map<String, List<String>> _mediumWords = {};
+  final Map<String, List<String>> _hardWords = {};
 
   /// Dile göre geçerli kelimeler (kullanıcı girişi doğrulama)
   final Map<String, Set<String>> _validWords = {};
@@ -36,15 +40,21 @@ class WordService {
       );
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      final solutions = (data['solutions'] as List<dynamic>)
-          .cast<String>()
-          .map((w) => w.toUpperCase())
-          .toList();
+      final easy = (data['solutions_easy'] as List<dynamic>?)?.cast<String>().map((w) => w.toUpperCase()).toList() ?? [];
+      final medium = (data['solutions_medium'] as List<dynamic>?)?.cast<String>().map((w) => w.toUpperCase()).toList() ?? [];
+      final hard = (data['solutions_hard'] as List<dynamic>?)?.cast<String>().map((w) => w.toUpperCase()).toList() ?? [];
+      
+      final allSols = data['solutions'] != null 
+          ? (data['solutions'] as List<dynamic>).cast<String>().map((w) => w.toUpperCase()).toList()
+          : [...easy, ...medium, ...hard];
 
-      _solutionWords[locale] = solutions;
+      _easyWords[locale] = easy.isNotEmpty ? easy : allSols;
+      _mediumWords[locale] = medium.isNotEmpty ? medium : allSols;
+      _hardWords[locale] = hard.isNotEmpty ? hard : allSols;
+      _solutionWords[locale] = allSols;
 
       // Geçerli kelimeler: çözüm kelimeleri + varsa ek valid listesi
-      final validSet = <String>{...solutions};
+      final validSet = <String>{...allSols};
       if (data['valid'] != null && (data['valid'] as List).isNotEmpty) {
         validSet.addAll(
           (data['valid'] as List<dynamic>)
@@ -114,7 +124,20 @@ class WordService {
   }) {
     _ensureLoaded(locale);
 
-    final words = _solutionWords[locale]!;
+    List<String> words;
+    // 1-100: Kolay, 101-250: Orta, 251-350: Zor
+    if (level <= 100) {
+      words = _easyWords[locale] ?? _solutionWords[locale]!;
+    } else if (level <= 250) {
+      words = _mediumWords[locale] ?? _solutionWords[locale]!;
+    } else {
+      words = _hardWords[locale] ?? _solutionWords[locale]!;
+    }
+
+    // Eğer kelime listesi bir şekilde boşsa fallback
+    if (words.isEmpty) {
+      return 'APPLE'; // Güvenli kelime
+    }
 
     // Seviye numarasını karıştır ki sıralı olmasın
     // Basit ama etkili bir shuffle: seviye * asal sayı mod toplam kelime
@@ -128,6 +151,7 @@ class WordService {
   /// Girilen kelimenin geçerli bir kelime olup olmadığını kontrol eder.
   bool isValidWord(String word, String locale) {
     _ensureLoaded(locale);
+    // Genişletilmiş veritabanı sayesinde artık kelimeyi gerçek sözlükte arıyoruz
     return _validWords[locale]!.contains(word.toUpperCase());
   }
 
