@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "535905372792",
+    "project_id": "wearth-370f1",
+    "storage_bucket": "wearth-370f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:535905372792:android:43676947221bcdf2b9bb8d",
+        "android_client_info": {
+          "package_name": "com.wearth.wearth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTeXg7Lm7McnWmcpgIWbyWkXM9Uay7pSE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

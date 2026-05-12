@@ -7,6 +7,8 @@ import '../services/storage_service.dart';
 import '../main.dart';
 import 'daily_game_screen.dart';
 import 'classic_map_screen.dart';
+import 'auth_screen.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -598,7 +600,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               label: _l10n.t('onlineMode'),
               accentColor: const Color(0xFF2196F3),
               onTap: () {
-                // TODO: Navigate to online game screen
+                if (!AuthService().isLoggedIn) {
+                  Navigator.of(context).push(AuthScreen.route());
+                } else {
+                  // TODO: Navigate to online game screen
+                }
               },
             ),
           ),
@@ -768,10 +774,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 final isSelected = _currentNavIndex == index;
                 return GestureDetector(
                   onTap: () {
+                    if (index == 2 && !AuthService().isLoggedIn) {
+                      Navigator.of(context).push(AuthScreen.route());
+                      return;
+                    }
                     setState(() {
                       _currentNavIndex = index;
                     });
-                    // TODO: Navigate to respective screens
+                    // TODO: Navigate to respective screens (e.g. ProfileScreen if index == 2)
                   },
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(

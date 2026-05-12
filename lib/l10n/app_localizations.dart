@@ -117,6 +117,18 @@ class AppLocalizations {
       'language': 'Dil',
       'turkish': 'Türkçe',
       'english': 'İngilizce',
+
+      // Auth
+      'login': 'Giriş Yap',
+      'signUp': 'Kayıt Ol',
+      'email': 'E-posta',
+      'password': 'Şifre',
+      'username': 'Kullanıcı Adı',
+      'haveAccount': 'Zaten hesabın var mı?',
+      'noAccount': 'Hesabın yok mu?',
+      'or': 'veya',
+      'continueWithGoogle': 'Google ile Devam Et',
+      'continueWithApple': 'Apple ile Devam Et',
     },
     'en': {
       // App
@@ -180,6 +192,18 @@ class AppLocalizations {
       'language': 'Language',
       'turkish': 'Turkish',
       'english': 'English',
+
+      // Auth
+      'login': 'Login',
+      'signUp': 'Sign Up',
+      'email': 'Email',
+      'password': 'Password',
+      'username': 'Username',
+      'haveAccount': 'Already have an account?',
+      'noAccount': 'Don\'t have an account?',
+      'or': 'or',
+      'continueWithGoogle': 'Continue with Google',
+      'continueWithApple': 'Continue with Apple',
     },
   };
 }

@@ -4,12 +4,19 @@ import 'services/word_service.dart';
 import 'services/storage_service.dart';
 import 'services/life_service.dart';
 import 'theme/app_theme.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 // Global tema notifier
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase'i Başlat
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Servisleri başlat
   await StorageService().init();
