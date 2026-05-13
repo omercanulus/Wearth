@@ -14,7 +14,11 @@ class AuthService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Web'de clientId gereklidir; Android/iOS kendi config dosyalarından otomatik alır
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb
+        ? "535905372792-7mkjlpf8q9melsh5ph6qkbg0oc1vpfkh.apps.googleusercontent.com"
+        : null,
     scopes: ['email', 'profile'],
   );
 

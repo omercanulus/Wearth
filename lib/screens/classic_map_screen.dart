@@ -35,7 +35,7 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
   Future<void> _loadProgress() async {
     final level = await _storage.loadClassicLevel(locale: _l10n.currentLocale);
     setState(() {
-      _currentLevel = level == 1 ? 10 : level; // For UI demo purposes
+      _currentLevel = level;
       _visibleContinent = WorldData.getContinentForLevel(_currentLevel);
       _isLoading = false;
     });

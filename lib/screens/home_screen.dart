@@ -9,6 +9,9 @@ import 'daily_game_screen.dart';
 import 'classic_map_screen.dart';
 import 'auth_screen.dart';
 import '../services/auth_service.dart';
+import 'profile_screen.dart';
+import 'settings_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -72,108 +75,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Main content
           SafeArea(
             bottom: false,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 80),
-
-                        // Game Logo
-                        Image.asset(
-                          'assets/images/wearth_logo.png',
-                          height: 300,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return ShaderMask(
-                              shaderCallback: (bounds) => const LinearGradient(
-                                colors: [
-                                  Color(0xFF4CAF50),
-                                  Color(0xFF2196F3),
-                                  Color(0xFF4CAF50),
-                                ],
-                              ).createShader(bounds),
-                              child: Text(
-                                'WEARTH',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Word of the Day Button
-                        _buildWordOfTheDayButton(),
-
-                        const SizedBox(height: 12),
-
-                        // Mode Buttons
-                        _buildModeButtons(),
-
-                        const SizedBox(height: 20),
-
-                        // Version info
-                        Text(
-                          _l10n.t('version'),
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            color: context.wearth.textVersion,
-                          ),
-                        ),
-
-                        // Space for bottom navbar
-                        const SizedBox(height: 100),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _buildCurrentBody(),
           ),
 
           // Top-right buttons: Language + How to Play
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildLiquidGlassLanguageButton(),
-                const SizedBox(height: 8),
-                // Language dropdown menu (animated)
-                _buildLanguageDropdown(),
-                const SizedBox(height: 8),
-                _buildLiquidGlassHowToPlayButton(),
-              ],
+          if (_currentNavIndex == 0)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildLiquidGlassLanguageButton(),
+                  const SizedBox(height: 8),
+                  // Language dropdown menu (animated)
+                  _buildLanguageDropdown(),
+                ],
+              ),
             ),
-          ),
 
           // Top-left buttons: Premium + Settings
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPremiumButton(),
-                const SizedBox(height: 8),
-                _buildSettingsIconButton(),
-                const SizedBox(height: 8),
-                _buildThemeToggleButton(),
-              ],
+          if (_currentNavIndex == 0)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPremiumButton(),
+                  const SizedBox(height: 8),
+                  _buildSettingsIconButton(),
+                  const SizedBox(height: 8),
+                  _buildThemeToggleButton(),
+                ],
+              ),
             ),
-          ),
 
           // Close language menu when tapping outside
           if (_isLanguageMenuOpen)
@@ -198,6 +134,101 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Bottom Liquid Glass Navbar
       extendBody: true,
       bottomNavigationBar: _buildLiquidGlassNavbar(),
+    );
+  }
+
+  Widget _buildCurrentBody() {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildHomeContent();
+      case 1:
+        return Center(
+          child: Text(
+            _l10n.t('ranking'),
+            style: GoogleFonts.outfit(color: context.wearth.textPrimary),
+          ),
+        );
+      case 2:
+        return ProfileScreen(
+          onSignOut: () {
+            setState(() {
+              _currentNavIndex = 0;
+            });
+          },
+        );
+      default:
+        return _buildHomeContent();
+    }
+  }
+
+  Widget _buildHomeContent() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 80),
+
+                // Game Logo
+                Image.asset(
+                  'assets/images/wearth_logo.png',
+                  height: 300,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [
+                          Color(0xFF4CAF50),
+                          Color(0xFF2196F3),
+                          Color(0xFF4CAF50),
+                        ],
+                      ).createShader(bounds),
+                      child: Text(
+                        'WEARTH',
+                        style: GoogleFonts.outfit(
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 32),
+
+                // Word of the Day Button
+                _buildWordOfTheDayButton(),
+
+                const SizedBox(height: 12),
+
+                // Mode Buttons
+                _buildModeButtons(),
+
+                const SizedBox(height: 20),
+
+                // Version info
+                Text(
+                  _l10n.t('version'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: context.wearth.textVersion,
+                  ),
+                ),
+
+                // Space for bottom navbar
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -271,11 +302,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Liquid glass settings icon button (no label)
   Widget _buildSettingsIconButton() {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to settings screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const SettingsScreen(),
+            fullscreenDialog: true,
+          ),
+        );
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
@@ -515,58 +550,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Liquid glass style how to play button
-  Widget _buildLiquidGlassHowToPlayButton() {
-    return GestureDetector(
-      onTap: () {
-        // TODO: Navigate to how to play screen
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: context.wearth.glassBackground,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: const Color(0xFF4CAF50).withAlpha(50),
-                width: 0.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF4CAF50).withAlpha(15),
-                  blurRadius: 16,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.help_outline_rounded,
-                  size: 18,
-                  color: const Color(0xFF4CAF50),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _l10n.t('howToPlay'),
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF4CAF50),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
 
 

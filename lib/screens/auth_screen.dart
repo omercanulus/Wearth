@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -63,11 +65,15 @@ class _AuthScreenState extends State<AuthScreen> {
           _passwordController.text.trim(),
         );
       } else {
-        await AuthService().signUpWithEmail(
+        final credential = await AuthService().signUpWithEmail(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
-        // TODO: Kullanıcı adını Firestore'a veya Profil'e kaydetme işlemi eklenecek
+        // Kullanıcı adını Firebase profiline kaydet
+        if (credential?.user != null && _usernameController.text.trim().isNotEmpty) {
+          await credential!.user!.updateDisplayName(_usernameController.text.trim());
+          await credential.user!.reload();
+        }
       }
 
       if (mounted) {
@@ -76,16 +82,7 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Hata: ${e.toString()}',
-              style: GoogleFonts.outfit(color: Colors.white),
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showError(e);
       }
     } finally {
       if (mounted) {
@@ -102,7 +99,7 @@ class _AuthScreenState extends State<AuthScreen> {
       await AuthService().signInWithGoogle();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      _showError(e.toString());
+      _showError(e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -114,18 +111,60 @@ class _AuthScreenState extends State<AuthScreen> {
       await AuthService().signInWithApple();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      _showError(e.toString());
+      _showError(e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showError(String message) {
+  String _getFriendlyErrorMessage(dynamic e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'user-not-found':
+          return 'Bu e-posta adresi ile kayıtlı bir kullanıcı bulunamadı.';
+        case 'wrong-password':
+          return 'Girdiğiniz şifre hatalı. Lütfen tekrar deneyin.';
+        case 'email-already-in-use':
+          return 'Bu e-posta adresi zaten başka bir hesap tarafından kullanılıyor.';
+        case 'invalid-email':
+          return 'Lütfen geçerli bir e-posta adresi giriniz.';
+        case 'weak-password':
+          return 'Şifreniz çok zayıf. Lütfen daha güçlü bir şifre belirleyin.';
+        case 'network-request-failed':
+          return 'İnternet bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edin.';
+        case 'too-many-requests':
+          return 'Çok fazla deneme yaptınız. Lütfen bir süre sonra tekrar deneyin.';
+        case 'operation-not-allowed':
+          return 'Bu giriş yöntemi şu an aktif değil.';
+        default:
+          return e.message ?? 'Bir hata oluştu. Lütfen tekrar deneyin.';
+      }
+    }
+    return e.toString().contains('popup_closed_by_user') 
+        ? 'Giriş işlemi iptal edildi.' 
+        : 'Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.';
+  }
+
+  void _showError(dynamic e) {
+    final message = _getFriendlyErrorMessage(e);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Hata: $message', style: GoogleFonts.outfit(color: Colors.white)),
-        backgroundColor: Colors.redAccent,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.redAccent.withAlpha(230),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -355,7 +394,7 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         _buildSocialButton(
           label: _l10n.t('continueWithGoogle'),
-          iconPath: 'assets/images/google_logo.png', // Logo var sayıyoruz veya icon kullanabiliriz
+          icon: Icons.g_mobiledata_rounded,
           onTap: _signInWithGoogle,
           color: Colors.white,
           textColor: const Color(0xFF1F2937),
@@ -470,43 +509,83 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildSubmitButton() {
     return GestureDetector(
       onTap: _isLoading ? null : _submitForm,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         height: 56,
         width: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2196F3), Color(0xFF4CAF50)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+          borderRadius: BorderRadius.circular(18),
+          color: const Color(0xFF1A1A2E),
+          border: Border.all(
+            color: Colors.white.withAlpha(15),
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2196F3).withAlpha(80),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF8B5CF6).withAlpha(30),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFF06B6D4).withAlpha(20),
+              blurRadius: 30,
+              spreadRadius: 0,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Center(
-          child: _isLoading
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Text(
-                  _isLogin ? _l10n.t('login') : _l10n.t('signUp'),
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
+        child: Stack(
+          children: [
+            // Subtle gradient overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF8B5CF6).withAlpha(30),
+                      const Color(0xFF06B6D4).withAlpha(20),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
+              ),
+            ),
+            Center(
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _isLogin ? _l10n.t('login') : _l10n.t('signUp'),
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white.withAlpha(180),
+                          size: 20,
+                        ),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
