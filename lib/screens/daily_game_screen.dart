@@ -462,8 +462,8 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
   /// Oyun bitti bildirimi (Modal içerik)
   Widget _buildGameOverBanner(GameStats stats) {
     final won = _gameState.status == GameStatus.won;
+    final accent = won ? const Color(0xFF4CAF50) : const Color(0xFFEF4444);
     
-    // Ortalama deneme hesaplama
     double avgAttempts = 0.0;
     if (stats.gamesWon > 0) {
       int total = 0;
@@ -473,136 +473,14 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
       avgAttempts = total / stats.gamesWon;
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            decoration: BoxDecoration(
-              color: context.wearth.glassBackgroundStrong,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: context.wearth.glassBorder,
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (won
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFEF4444))
-                      .withAlpha(15),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Çarpı butonu
-                Align(
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: context.wearth.tileEmpty,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.close, size: 20, color: context.wearth.textPrimary),
-                    ),
-                  ),
-                ),
-                
-                // Seri (Streak) Gösterimi
-                if (stats.currentStreak > 0)
-                  SizedBox(
-                    height: 110,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/images/streak_image.png',
-                          height: 110,
-                          fit: BoxFit.contain,
-                        ),
-                        Align(
-                          alignment: const Alignment(0.0, 0.35),
-                          child: Text(
-                            '${stats.currentStreak}',
-                            style: GoogleFonts.bungee(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 42,
-                              color: context.isDark ? Colors.white : Colors.black,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Text(
-                    'Serini başlatmak için yarın tekrar gel!',
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: context.wearth.textMuted,
-                    ),
-                  ),
-                
-                const SizedBox(height: 24),
-
-                // İstatistikler Grid
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildStatItem('Oyun', '${stats.gamesPlayed}'),
-                    _buildStatItem('Başarı', '${stats.winPercentage.toStringAsFixed(0)}%'),
-                    _buildStatItem('Seri', '${stats.maxStreak}'),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildStatItem('Bugün', won ? '${_gameState.currentAttempt}' : 'X'),
-                    _buildStatItem('Ortalama', avgAttempts > 0 ? avgAttempts.toStringAsFixed(1) : '-'),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // Ana Tebrik / Kaybetme Mesajı
-                Text(
-                  won ? _l10n.t('congratulations') : _l10n.t('gameOver'),
-                  style: GoogleFonts.outfit(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: won ? const Color(0xFF4CAF50) : const Color(0xFFEF4444),
-                  ),
-                ),
-                if (!won) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_l10n.t('correctWord')} ${_gameState.targetWord}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: context.wearth.textPrimary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _DailyResultCard(
+      won: won,
+      accent: accent,
+      stats: stats,
+      avgAttempts: avgAttempts,
+      currentAttempt: _gameState.currentAttempt,
+      targetWord: _gameState.targetWord,
+      l10n: _l10n,
     );
   }
 
@@ -728,5 +606,223 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
         ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE'],
       ];
     }
+  }
+}
+
+/// Günlük kelime sonuç kartı — modern, lokalize, kelime gizleme
+class _DailyResultCard extends StatefulWidget {
+  final bool won;
+  final Color accent;
+  final GameStats stats;
+  final double avgAttempts;
+  final int currentAttempt;
+  final String targetWord;
+  final AppLocalizations l10n;
+
+  const _DailyResultCard({
+    required this.won,
+    required this.accent,
+    required this.stats,
+    required this.avgAttempts,
+    required this.currentAttempt,
+    required this.targetWord,
+    required this.l10n,
+  });
+
+  @override
+  State<_DailyResultCard> createState() => _DailyResultCardState();
+}
+
+class _DailyResultCardState extends State<_DailyResultCard> {
+  bool _wordRevealed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.won) _wordRevealed = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = widget.l10n;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            decoration: BoxDecoration(
+              color: context.wearth.glassBackgroundStrong,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: widget.accent.withAlpha(40), width: 1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Kapatma butonu
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: context.wearth.tileEmpty,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.close, size: 18, color: context.wearth.textSecondary),
+                    ),
+                  ),
+                ),
+
+                // Emoji + başlık
+                Text(
+                  widget.won ? '🎉' : '😔',
+                  style: const TextStyle(fontSize: 44),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.won ? l.t('congratulations') : l.t('gameOver'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: widget.accent,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Seri gösterimi
+                if (widget.stats.currentStreak > 0)
+                  SizedBox(
+                    height: 100,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/streak_image.png',
+                          height: 100,
+                          fit: BoxFit.contain,
+                        ),
+                        Align(
+                          alignment: const Alignment(0.0, 0.35),
+                          child: Text(
+                            '${widget.stats.currentStreak}',
+                            style: GoogleFonts.bungee(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 38,
+                              color: context.isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Text(
+                    l.t('startStreak'),
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.wearth.textMuted,
+                    ),
+                  ),
+                const SizedBox(height: 20),
+
+                // Kelime gösterimi
+                _wordRevealed
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: widget.accent.withAlpha(12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: widget.accent.withAlpha(30)),
+                        ),
+                        child: Text(
+                          widget.targetWord,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 6,
+                            color: widget.accent,
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: () => setState(() => _wordRevealed = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: context.wearth.keyBackground.withAlpha(60),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: context.wearth.glassBorder),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.visibility_outlined, size: 16, color: context.wearth.textSecondary),
+                              const SizedBox(width: 8),
+                              Text(
+                                l.t('tapToRevealWord'),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.wearth.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                const SizedBox(height: 20),
+
+                // İstatistikler
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _stat(l.t('played'), '${widget.stats.gamesPlayed}'),
+                    _stat(l.t('winRate'), '${widget.stats.winPercentage.toStringAsFixed(0)}%'),
+                    _stat(l.t('streak'), '${widget.stats.maxStreak}'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _stat(l.t('today'), widget.won ? '${widget.currentAttempt}' : 'X'),
+                    _stat(l.t('average'), widget.avgAttempts > 0 ? widget.avgAttempts.toStringAsFixed(1) : '-'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stat(String title, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: context.wearth.textPrimary,
+          ),
+        ),
+        Text(
+          title,
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: context.wearth.textMuted,
+          ),
+        ),
+      ],
+    );
   }
 }

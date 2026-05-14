@@ -11,6 +11,7 @@ import 'auth_screen.dart';
 import '../services/auth_service.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
+import 'online_matchmaking_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -586,7 +587,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 if (!AuthService().isLoggedIn) {
                   Navigator.of(context).push(AuthScreen.route());
                 } else {
-                  // TODO: Navigate to online game screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const OnlineMatchmakingScreen(),
+                    ),
+                  );
                 }
               },
             ),

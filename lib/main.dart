@@ -14,9 +14,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Firebase'i Başlat
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Hot restart sırasında duplicate-app hatası olabilir, yoksay
+    Firebase.app();
+  }
 
   // Servisleri başlat
   await StorageService().init();

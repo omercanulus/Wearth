@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '535905372792',
     projectId: 'wearth-370f1',
     authDomain: 'wearth-370f1.firebaseapp.com',
+    databaseURL: 'https://wearth-370f1-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'wearth-370f1.firebasestorage.app',
     measurementId: 'G-4K4L47LZ45',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:535905372792:android:43676947221bcdf2b9bb8d',
     messagingSenderId: '535905372792',
     projectId: 'wearth-370f1',
+    databaseURL: 'https://wearth-370f1-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'wearth-370f1.firebasestorage.app',
   );
 
@@ -63,6 +65,7 @@ class DefaultFirebaseOptions {
     appId: '1:535905372792:ios:029867163a25f764b9bb8d',
     messagingSenderId: '535905372792',
     projectId: 'wearth-370f1',
+    databaseURL: 'https://wearth-370f1-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'wearth-370f1.firebasestorage.app',
     iosBundleId: 'com.wearth.wearth',
   );
@@ -72,6 +75,7 @@ class DefaultFirebaseOptions {
     appId: '1:535905372792:ios:029867163a25f764b9bb8d',
     messagingSenderId: '535905372792',
     projectId: 'wearth-370f1',
+    databaseURL: 'https://wearth-370f1-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'wearth-370f1.firebasestorage.app',
     iosBundleId: 'com.wearth.wearth',
   );
@@ -82,6 +86,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '535905372792',
     projectId: 'wearth-370f1',
     authDomain: 'wearth-370f1.firebaseapp.com',
+    databaseURL: 'https://wearth-370f1-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'wearth-370f1.firebasestorage.app',
     measurementId: 'G-9XYTB2M5WR',
   );

@@ -81,6 +81,14 @@ class WordService {
     ]);
   }
 
+  // ─── Kelime Listesine Erişim ───────────────────────────────────
+
+  /// Çözüm kelimelerinin listesini döndürür (online mod için).
+  List<String> getSolutionWords(String locale) {
+    _ensureLoaded(locale);
+    return List.unmodifiable(_solutionWords[locale] ?? []);
+  }
+
   // ─── Günün Kelimesi ────────────────────────────────────────────
 
   /// Belirtilen tarih için günün kelimesini döndürür.
