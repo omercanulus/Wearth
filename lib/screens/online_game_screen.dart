@@ -6,6 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../services/matchmaking_service.dart';
 import '../services/auth_service.dart';
 import '../services/word_service.dart';
+import '../services/social_service.dart';
 import '../models/game_state.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
@@ -230,11 +231,63 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
               ),
             ),
 
-            // Klavye
+            // Klavye veya Sonuç Butonu
             if (!_gameState.isGameOver && !_gameEnded)
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: _buildKeyboard(),
+              )
+            else if (_gameEnded)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                child: GestureDetector(
+                  onTap: () => _showGameResult(_matchData!),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: context.wearth.glassBackgroundStrong,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: context.wearth.glassBorder,
+                            width: 0.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(10),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.analytics_outlined,
+                              color: context.wearth.textPrimary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              _l10n.t('viewResults').toUpperCase(),
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: context.wearth.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
             const SizedBox(height: 16),
@@ -281,7 +334,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
             ),
           ),
           Text(
-            'QUICK MODE',
+            _l10n.t('quickMode').toUpperCase(),
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -669,14 +722,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
-            'Maçtan Ayrıl',
+            _l10n.t('leaveMatch'),
             style: GoogleFonts.outfit(
               fontWeight: FontWeight.w700,
               color: context.wearth.textPrimary,
             ),
           ),
           content: Text(
-            'Ayrılırsan maçı kaybedersin. Emin misin?',
+            _l10n.t('leaveMatchWarning'),
             style: GoogleFonts.outfit(
               color: context.wearth.textSecondary,
             ),
@@ -685,7 +738,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
               child: Text(
-                'Hayır',
+                _l10n.t('no'),
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.w600,
                   color: context.wearth.textSecondary,
@@ -699,7 +752,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                 if (mounted) Navigator.of(context).pop();
               },
               child: Text(
-                'Evet, Ayrıl',
+                _l10n.t('yes'),
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.w700,
                   color: Colors.redAccent,
@@ -747,6 +800,7 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
   bool _wordRevealed = false;
   bool _rematchSent = false;
   bool _opponentWantsRematch = false;
+  String _friendshipStatus = 'none'; // none, sent, received, friend
   StreamSubscription? _rematchSub;
   StreamSubscription? _newMatchSub;
 
@@ -754,7 +808,16 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
   void initState() {
     super.initState();
     if (widget.isWinner) _wordRevealed = true;
+    _checkFriendship();
     _listenRematch();
+  }
+
+  void _checkFriendship() async {
+    final opponentUid = widget.matchData.players.entries
+        .firstWhere((e) => e.key != widget.myUid)
+        .key;
+    final status = await SocialService().getRelationshipStatus(opponentUid);
+    if (mounted) setState(() => _friendshipStatus = status);
   }
 
   void _listenRematch() {
@@ -961,10 +1024,60 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
                         Expanded(child: _playerStat(
                             widget.opponentName.isNotEmpty ? widget.opponentName : _l10n.t('opponent'),
                             '${widget.opponentGuessCount} ${_l10n.t('guessCount')}',
-                            widget.matchData.players.entries.where((e) => e.key != widget.myUid).firstOrNull?.value.solved == true,
+                             widget.matchData.players.entries.where((e) => e.key != widget.myUid).firstOrNull?.value.solved == true,
                             const Color(0xFFEF4444))),
                       ],
                     ),
+                    const SizedBox(height: 12),
+
+                    // Arkadaş Ekle / İptal Et Butonu
+                    if (_friendshipStatus != 'friend' && _friendshipStatus != 'blocked')
+                      GestureDetector(
+                        onTap: () async {
+                          final opponentUid = widget.matchData.players.entries
+                              .firstWhere((e) => e.key != widget.myUid).key;
+                          if (_friendshipStatus == 'none') {
+                            await SocialService().sendFriendRequest(opponentUid);
+                          } else if (_friendshipStatus == 'sent') {
+                            await SocialService().cancelFriendRequest(opponentUid);
+                          }
+                          _checkFriendship();
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _friendshipStatus == 'sent' 
+                                ? const Color(0xFFEF4444).withAlpha(20) 
+                                : const Color(0xFF3B82F6).withAlpha(20),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _friendshipStatus == 'sent' 
+                                  ? const Color(0xFFEF4444).withAlpha(50) 
+                                  : const Color(0xFF3B82F6).withAlpha(50),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _friendshipStatus == 'sent' ? Icons.close_rounded : Icons.person_add_rounded,
+                                size: 16,
+                                color: _friendshipStatus == 'sent' ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _friendshipStatus == 'sent' ? _l10n.t('cancelRequest') : _l10n.t('addFriend'),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _friendshipStatus == 'sent' ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 18),
 
                     // Rematch bildirimi

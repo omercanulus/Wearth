@@ -223,12 +223,59 @@ class _DailyGameScreenState extends State<DailyGameScreen> {
               ),
             ),
 
-            // Klavye (Sadece oyun devam ediyorsa veya bitmişse de klavye yerinde kalabilir, banner popup oldu)
-            // Ama klavyeyi gizlemek istersen yine isGameOver kontrolü kalabilir. Şimdilik gizliyoruz.
+            // Klavye veya Sonuç Butonu
             if (!_gameState.isGameOver) 
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: _buildKeyboard(),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                child: GestureDetector(
+                  onTap: () async {
+                    final stats = await StorageService().loadStats(locale: _gameState.locale);
+                    if (mounted) _showGameOverDialog(stats);
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: context.wearth.glassBackgroundStrong,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: context.wearth.glassBorder,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.analytics_outlined,
+                              color: context.wearth.textPrimary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              _l10n.t('viewResults').toUpperCase(),
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: context.wearth.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
             const SizedBox(height: 16),

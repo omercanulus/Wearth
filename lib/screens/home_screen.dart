@@ -12,6 +12,10 @@ import '../services/auth_service.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'online_matchmaking_screen.dart';
+import 'friends_screen.dart';
+import '../services/social_service.dart';
+import 'dart:ui';
+import 'dart:async';
 
 
 class HomeScreen extends StatefulWidget {
@@ -27,6 +31,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLanguageMenuOpen = false;
   late AnimationController _languageMenuController;
   late Animation<double> _languageMenuAnimation;
+  
+  // Sosyal bildirimler için
+  StreamSubscription? _requestsSubscription;
+  int _lastRequestCount = 0;
+  bool _hasNewRequest = false;
+  OverlayEntry? _notificationOverlay;
 
   @override
   void initState() {
@@ -40,10 +50,128 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+    
+    // Arkadaşlık isteklerini dinle
+    _initSocialNotifications();
+    _ensureProfile();
+  }
+
+  void _initSocialNotifications() {
+    _requestsSubscription = SocialService().listenIncomingRequests().listen((requests) {
+      if (!mounted) return;
+
+      setState(() {
+        _hasNewRequest = requests.isNotEmpty;
+      });
+
+      // Eğer istek sayısı arttıysa bildirim göster
+      if (requests.length > _lastRequestCount) {
+        final newRequest = requests.last;
+        _showTopNotification(newRequest.username);
+      }
+      _lastRequestCount = requests.length;
+    });
+  }
+
+  void _showTopNotification(String username) {
+    _notificationOverlay?.remove();
+    _notificationOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 500),
+            tween: Tween(begin: -100.0, end: 0.0),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) => Transform.translate(
+              offset: Offset(0, value),
+              child: child,
+            ),
+            child: _buildNotificationBanner(username),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_notificationOverlay!);
+    
+    // 4 saniye sonra bildirimi kaldır
+    Future.delayed(const Duration(seconds: 4), () {
+      if (_notificationOverlay != null) {
+        _notificationOverlay?.remove();
+        _notificationOverlay = null;
+      }
+    });
+  }
+
+  Widget _buildNotificationBanner(String username) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF3B82F6).withAlpha(120), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(50),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withAlpha(30),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person_add_rounded, color: Color(0xFF3B82F6), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _l10n.t('friendRequests'),
+                  style: GoogleFonts.outfit(fontSize: 12, color: context.wearth.textSecondary, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '$username ${_l10n.t('wantsToBeFriend') ?? 'sana istek gönderdi!'}',
+                  style: GoogleFonts.outfit(fontSize: 14, color: context.wearth.textPrimary, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            onPressed: () {
+              _notificationOverlay?.remove();
+              _notificationOverlay = null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _ensureProfile() async {
+    if (AuthService().isLoggedIn) {
+      await SocialService().ensureProfile();
+    }
   }
 
   @override
   void dispose() {
+    _requestsSubscription?.cancel();
+    _notificationOverlay?.remove();
     _languageMenuController.dispose();
     super.dispose();
   }
@@ -211,6 +339,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 // Mode Buttons
                 _buildModeButtons(),
+
+                const SizedBox(height: 20),
+
+                // Arkadaş Butonu
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FriendsScreen()),
+                      ),
+                      child: _glassIconButton(Icons.people_alt_rounded),
+                    ),
+                    if (_hasNewRequest)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: context.wearth.scaffoldBg, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
 
                 const SizedBox(height: 20),
 
@@ -447,6 +605,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFriendsIconButton() {
+    return GestureDetector(
+      onTap: () {
+        if (!AuthService().isLoggedIn) {
+          Navigator.of(context).push(AuthScreen.route());
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const FriendsScreen()),
+          );
+        }
+      },
+      child: _glassIconButton(Icons.people_alt_rounded),
+    );
+  }
+
+  Widget _glassIconButton(IconData icon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: context.wearth.glassBackground,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: const Color(0xFF3B82F6).withAlpha(60),
+              width: 0.5,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFF3B82F6),
+            size: 24,
           ),
         ),
       ),
