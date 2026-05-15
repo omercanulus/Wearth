@@ -14,6 +14,7 @@ import 'settings_screen.dart';
 import 'online_matchmaking_screen.dart';
 import 'friends_screen.dart';
 import '../services/social_service.dart';
+import '../services/matchmaking_service.dart';
 import 'dart:ui';
 import 'dart:async';
 
@@ -33,10 +34,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _languageMenuAnimation;
   
   // Sosyal bildirimler için
+  StreamSubscription? _authSubscription;
   StreamSubscription? _requestsSubscription;
+  StreamSubscription? _gameInvitesSubscription;
   int _lastRequestCount = 0;
   bool _hasNewRequest = false;
   OverlayEntry? _notificationOverlay;
+  final Set<String> _processedInvites = {};
 
   @override
   void initState() {
@@ -51,12 +55,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       reverseCurve: Curves.easeInCubic,
     );
     
-    // Arkadaşlık isteklerini dinle
-    _initSocialNotifications();
-    _ensureProfile();
+    // Auth durumunu dinle ve login olunca listener'ları başlat
+    _authSubscription = AuthService().authStateChanges.listen((user) {
+      if (user != null) {
+        _initSocialNotifications();
+        _initGameInvitesListener();
+        _ensureProfile();
+      } else {
+        _requestsSubscription?.cancel();
+        _gameInvitesSubscription?.cancel();
+      }
+    });
   }
 
   void _initSocialNotifications() {
+    _requestsSubscription?.cancel();
     _requestsSubscription = SocialService().listenIncomingRequests().listen((requests) {
       if (!mounted) return;
 
@@ -71,6 +84,192 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       _lastRequestCount = requests.length;
     });
+  }
+
+  void _initGameInvitesListener() {
+    _gameInvitesSubscription?.cancel();
+    _gameInvitesSubscription = MatchmakingService().listenToGameInvites().listen((invites) {
+      if (!mounted || invites == null) {
+        debugPrint('🟡 Oyun daveti yok veya henüz yüklenmedi');
+        return;
+      }
+
+      debugPrint('🔵 Gelen davetler: ${invites.length}');
+
+      for (var entry in invites.entries) {
+        final challengerUid = entry.key;
+        final inviteData = Map<String, dynamic>.from(entry.value as Map);
+        final matchId = inviteData['matchId'] as String;
+        final challengerName = inviteData['challengerName'] as String;
+        final createdAt = inviteData['createdAt'] as int? ?? 0;
+        
+        final now = DateTime.now().millisecondsSinceEpoch;
+
+        // Eğer bu daveti zaten işlediysek atla
+        if (_processedInvites.contains(matchId)) continue;
+        
+        // 5 dakikadan eski davetleri gösterme (stale data koruması)
+        if (createdAt > 0 && (now - createdAt).abs() > 300000) {
+          debugPrint('⚪ Eski davet atlandı: $matchId');
+          continue;
+        }
+
+        _processedInvites.add(matchId);
+        _showChallengeDialog(challengerUid, challengerName, matchId);
+      }
+    });
+  }
+
+  void _showChallengeDialog(String challengerUid, String challengerName, String matchId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: context.wearth.glassBackgroundStrong,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: context.wearth.glassBorder, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withAlpha(30),
+                  blurRadius: 40,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // İkon ve Başlık
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF3B82F6).withAlpha(150),
+                          const Color(0xFF8B5CF6).withAlpha(150),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF3B82F6).withAlpha(50),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.bolt_rounded, size: 40, color: Colors.white),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'MEYDAN OKUMA!',
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                      color: context.wearth.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    challengerName,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF3B82F6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'sana oyun daveti gönderdi!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      color: context.wearth.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Butonlar
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _dialogButton(
+                          label: 'Reddet',
+                          isOutline: true,
+                          onTap: () {
+                            MatchmakingService().respondToGameInvite(
+                              challengerUid: challengerUid,
+                              matchId: matchId,
+                              accept: false,
+                            );
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _dialogButton(
+                          label: 'Kabul Et',
+                          isOutline: false,
+                          onTap: () {
+                            MatchmakingService().respondToGameInvite(
+                              challengerUid: challengerUid,
+                              matchId: matchId,
+                              accept: true,
+                            );
+                            Navigator.pop(context);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => OnlineMatchmakingScreen(matchId: matchId),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogButton({required String label, required bool isOutline, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          gradient: isOutline ? null : const LinearGradient(
+            colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+          ),
+          color: isOutline ? Colors.transparent : null,
+          borderRadius: BorderRadius.circular(16),
+          border: isOutline ? Border.all(color: context.wearth.glassBorder) : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: isOutline ? context.wearth.textSecondary : Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showTopNotification(String username) {
@@ -170,7 +369,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _requestsSubscription?.cancel();
+    _gameInvitesSubscription?.cancel();
     _notificationOverlay?.remove();
     _languageMenuController.dispose();
     super.dispose();

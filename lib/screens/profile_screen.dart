@@ -7,6 +7,8 @@ import '../services/storage_service.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../data/world_data.dart';
+import '../services/matchmaking_service.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSignOut;
@@ -21,13 +23,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   final AppLocalizations _l10n = AppLocalizations();
   final AuthService _auth = AuthService();
   final StorageService _storage = StorageService();
+  final MatchmakingService _matchmaking = MatchmakingService();
 
+  late TabController _tabController;
   late Future<Map<String, dynamic>> _profileData;
   late AnimationController _shimmerController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _profileData = _loadProfileData();
     _shimmerController = AnimationController(
       vsync: this,
@@ -37,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _shimmerController.dispose();
     super.dispose();
   }
@@ -100,42 +106,50 @@ class _ProfileScreenState extends State<ProfileScreen>
           final totalStars = snapshot.data!['totalStars'] as int;
           final rankColor = _getRankColor(classicLevel);
 
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              children: [
-                // ── Hero Header ──────────────────────────────
-                _buildHeroHeader(user, classicLevel, rankColor),
-
-                // ── Content ──────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 24),
-
-                      // Quick Stats Row
-                      _buildQuickStatsRow(stats, classicLevel, totalStars),
-
-                      const SizedBox(height: 24),
-
-                      // Guess Distribution
-                      _buildGuessDistribution(stats),
-
-                      const SizedBox(height: 24),
-
-                      // Level Progress
-                      _buildLevelProgress(classicLevel),
-
-                      const SizedBox(height: 24),
-
-                      // Sign Out
-                      _buildSignOutButton(),
-
-                      const SizedBox(height: 120),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverToBoxAdapter(
+                child: _buildHeroHeader(user, classicLevel, rankColor),
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: rankColor,
+                    labelColor: context.wearth.textPrimary,
+                    unselectedLabelColor: context.wearth.textSecondary,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    tabs: const [
+                      Tab(text: 'İstatistikler'),
+                      Tab(text: 'Maç Geçmişi'),
                     ],
                   ),
                 ),
+              ),
+            ],
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                // Sekme 1: İstatistikler
+                SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    children: [
+                      _buildQuickStatsRow(stats, classicLevel, totalStars),
+                      const SizedBox(height: 24),
+                      _buildGuessDistribution(stats),
+                      const SizedBox(height: 24),
+                      _buildLevelProgress(classicLevel),
+                      const SizedBox(height: 32),
+                      _buildSignOutButton(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+                
+                // Sekme 2: Maç Geçmişi
+                _buildMatchHistoryTab(),
               ],
             ),
           );
@@ -143,6 +157,132 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
+
+  Widget _buildMatchHistoryTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _matchmaking.getMatchHistory(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final history = snapshot.data ?? [];
+        if (history.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history_rounded, size: 48, color: context.wearth.textMuted),
+                const SizedBox(height: 16),
+                Text('Henüz maç geçmişi yok.', style: GoogleFonts.outfit(color: context.wearth.textSecondary)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: history.length,
+          itemBuilder: (context, index) {
+            final item = history[index];
+            return FutureBuilder<MatchData?>(
+              future: _matchmaking.getMatchDetails(item['matchId']),
+              builder: (context, matchSnapshot) {
+                if (!matchSnapshot.hasData) return const SizedBox.shrink();
+                final match = matchSnapshot.data!;
+                return _buildMatchHistoryItem(match, item['timestamp']);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMatchHistoryItem(MatchData match, int timestamp) {
+    final myUid = _auth.currentUid;
+    final isWinner = match.winnerId == myUid;
+    final isDraw = match.winnerId == null;
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final opponent = match.players.entries.firstWhere((e) => e.key != myUid, 
+        orElse: () => MapEntry('unknown', PlayerData(uid: '?', name: 'Rakip'))).value;
+
+    final Color statusColor = isDraw ? Colors.orangeAccent : (isWinner ? const Color(0xFF10B981) : const Color(0xFFEF4444));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.wearth.glassBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.wearth.glassBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: statusColor.withAlpha(20),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isDraw ? Icons.drag_handle_rounded : (isWinner ? Icons.emoji_events_rounded : Icons.close_rounded),
+              color: statusColor,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  opponent.name,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: context.wearth.textPrimary,
+                  ),
+                ),
+                Text(
+                  DateFormat('dd MMM, HH:mm').format(date),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: context.wearth.textVersion,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                isDraw ? 'BERABERE' : (isWinner ? 'GALİBİYET' : 'MAĞLUBİYET'),
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: statusColor,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                match.word.toUpperCase(),
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: context.wearth.textSecondary,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
 
   // ═══════════════════════════════════════════════════════════════
   // HERO HEADER
@@ -668,5 +808,35 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          color: Theme.of(context).scaffoldBackgroundColor.withAlpha(200),
+          child: _tabBar,
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

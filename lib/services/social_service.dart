@@ -6,19 +6,39 @@ class UserProfile {
   final String uid;
   final String username;
   final String? email;
+  final int classicLevel;
+  final int gamesPlayed;
+  final int gamesWon;
+  final int maxStreak;
 
-  UserProfile({required this.uid, required this.username, this.email});
+  UserProfile({
+    required this.uid,
+    required this.username,
+    this.email,
+    this.classicLevel = 1,
+    this.gamesPlayed = 0,
+    this.gamesWon = 0,
+    this.maxStreak = 0,
+  });
 
   factory UserProfile.fromJson(Map<dynamic, dynamic> json) => UserProfile(
     uid: json['uid'] as String? ?? '',
     username: json['username'] as String? ?? 'Anonim',
     email: json['email'] as String?,
+    classicLevel: json['classicLevel'] as int? ?? 1,
+    gamesPlayed: json['gamesPlayed'] as int? ?? 0,
+    gamesWon: json['gamesWon'] as int? ?? 0,
+    maxStreak: json['maxStreak'] as int? ?? 0,
   );
 
   Map<String, dynamic> toJson() => {
     'uid': uid,
     'username': username,
     'email': email,
+    'classicLevel': classicLevel,
+    'gamesPlayed': gamesPlayed,
+    'gamesWon': gamesWon,
+    'maxStreak': maxStreak,
   };
 }
 
@@ -79,6 +99,38 @@ class SocialService {
       }
     } catch (e) {
       print('Profile güncelleme hatası: $e');
+    }
+  }
+
+  /// Klasik mod seviyesini Firebase'de günceller.
+  Future<void> updateClassicLevel(int level) async {
+    final uid = currentUid;
+    if (uid == null) return;
+
+    try {
+      await _db.ref('users/$uid/classicLevel').set(level);
+    } catch (e) {
+      print('Seviye senkronizasyon hatası: $e');
+    }
+  }
+
+  /// Kullanıcı istatistiklerini Firebase'de günceller.
+  Future<void> updateStats({
+    required int gamesPlayed,
+    required int gamesWon,
+    required int maxStreak,
+  }) async {
+    final uid = currentUid;
+    if (uid == null) return;
+
+    try {
+      await _db.ref('users/$uid').update({
+        'gamesPlayed': gamesPlayed,
+        'gamesWon': gamesWon,
+        'maxStreak': maxStreak,
+      });
+    } catch (e) {
+      print('İstatistik senkronizasyon hatası: $e');
     }
   }
 

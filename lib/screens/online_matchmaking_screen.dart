@@ -12,7 +12,8 @@ import 'online_game_screen.dart';
 /// Online mod eşleşme arama ekranı.
 /// Rakip bulunana kadar animasyonlu bekleme gösterir.
 class OnlineMatchmakingScreen extends StatefulWidget {
-  const OnlineMatchmakingScreen({super.key});
+  final String? matchId;
+  const OnlineMatchmakingScreen({super.key, this.matchId});
 
   @override
   State<OnlineMatchmakingScreen> createState() =>
@@ -75,11 +76,31 @@ class _OnlineMatchmakingScreenState extends State<OnlineMatchmakingScreen>
     });
 
     try {
-      final matchId = await _matchmaking.findOrCreateMatch(mode: 'quick');
+      final String matchId;
+      if (widget.matchId != null) {
+        matchId = widget.matchId!;
+        setState(() => _statusText = 'Arkadaşınız bekleniyor...');
+      } else {
+        matchId = await _matchmaking.findOrCreateMatch(mode: 'quick');
+      }
 
       // Maçı dinlemeye başla
       _matchSub = _matchmaking.listenToMatch(matchId).listen((matchData) {
-        if (matchData == null) return;
+        if (matchData == null) {
+          // Eğer biz bir maça doğrudan katılmaya çalışıyorsak (davetle)
+          // ve maç verisi yoksa/silindiyse (rakip reddettiyse) geri dön
+          if (widget.matchId != null && mounted) {
+            _matchSub?.cancel();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Davet geçersiz veya reddedildi'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+          return;
+        }
 
         if (matchData.status == MatchStatus.playing && !_matchFound) {
           setState(() {

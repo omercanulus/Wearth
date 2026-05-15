@@ -7,6 +7,8 @@ import '../services/matchmaking_service.dart';
 import '../services/auth_service.dart';
 import '../services/word_service.dart';
 import '../services/social_service.dart';
+import '../services/storage_service.dart';
+import '../widgets/profile_card.dart';
 import '../models/game_state.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_localizations.dart';
@@ -42,6 +44,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   // Maç durumu
   MatchData? _matchData;
   StreamSubscription<MatchData?>? _matchSub;
+  StreamSubscription? _rematchMatchSub;
   bool _gameEnded = false;
 
   @override
@@ -75,11 +78,26 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
         // Maç bittiyse
         if (data.status == MatchStatus.finished && !_gameEnded) {
           _gameEnded = true;
+          _updateLocalStats(data.winnerId == _myUid);
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) _showGameResult(data);
           });
         }
       });
+    });
+
+    // Rematch yönlendirmesini ana ekranda da dinle (diyalog kapalıyken de çalışsın)
+    _rematchMatchSub = _matchmaking.listenForRematchMatchId(widget.matchId).listen((newMatchId) {
+      if (newMatchId == null || !mounted) return;
+      
+      // Oyuna yönlendir
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(); // Sonuç diyaloğunu kapat
+      }
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => OnlineGameScreen(matchId: newMatchId)),
+      );
     });
   }
 
@@ -95,7 +113,31 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   @override
   void dispose() {
     _matchSub?.cancel();
+    _rematchMatchSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleExit() async {
+    if (!_gameEnded) {
+      _gameEnded = true; // Tekrar çalışmasını engelle
+      await _matchmaking.leaveMatch(matchId: widget.matchId);
+      await _updateLocalStats(false); // Ayrıldığı için mağlup say
+    }
+  }
+
+  Future<void> _updateLocalStats(bool isWin) async {
+    final stats = await StorageService().loadStats(locale: _l10n.currentLocale);
+    stats.gamesPlayed++;
+    if (isWin) stats.gamesWon++;
+    
+    await StorageService().saveStats(stats: stats, locale: _l10n.currentLocale);
+    
+    // Firebase ile senkronize et
+    SocialService().updateStats(
+      gamesPlayed: stats.gamesPlayed,
+      gamesWon: stats.gamesWon,
+      maxStreak: stats.maxStreak,
+    );
   }
 
   // ─── Oyun Mantığı ──────────────────────────────────────────────
@@ -207,11 +249,18 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: context.wearth.scaffoldBg,
-      body: SafeArea(
-        child: Column(
-          children: [
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) async {
+        if (didPop) {
+          _handleExit();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: context.wearth.scaffoldBg,
+        body: SafeArea(
+          child: Column(
+            children: [
             _buildTopBar(),
             _buildMessageBanner(),
 
@@ -294,8 +343,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ─── Top Bar ───────────────────────────────────────────────────
 
@@ -532,14 +582,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
           textColor = const Color(0xFF2E7D32);
           break;
         case LetterResult.present:
-          tileColor = const Color(0xFFFFC107).withAlpha(45);
-          borderColor = const Color(0xFFFFC107).withAlpha(100);
-          textColor = const Color(0xFFF57F17);
+          tileColor = const Color(0xFF06B6D4).withAlpha(45);
+          borderColor = const Color(0xFF06B6D4).withAlpha(100);
+          textColor = const Color(0xFF0891B2);
           break;
         case LetterResult.absent:
-          tileColor = const Color(0xFF9CA3AF).withAlpha(35);
-          borderColor = const Color(0xFF9CA3AF).withAlpha(70);
-          textColor = const Color(0xFF6B7280);
+          tileColor = context.wearth.glassBackground.withAlpha(20);
+          borderColor = context.wearth.glassBorder.withAlpha(40);
+          textColor = context.wearth.textMuted;
           break;
       }
     } else {
@@ -642,12 +692,12 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
           textColor = const Color(0xFF2E7D32);
           break;
         case LetterResult.present:
-          bgColor = const Color(0xFFFFC107).withAlpha(40);
-          textColor = const Color(0xFFF57F17);
+          bgColor = const Color(0xFF06B6D4).withAlpha(40);
+          textColor = const Color(0xFF0891B2);
           break;
         case LetterResult.absent:
-          bgColor = context.wearth.glassBackgroundStrong;
-          textColor = context.wearth.keyTextDisabled;
+          bgColor = context.wearth.glassBackgroundStrong.withAlpha(20);
+          textColor = context.wearth.textMuted;
           break;
       }
     } else {
@@ -802,7 +852,6 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
   bool _opponentWantsRematch = false;
   String _friendshipStatus = 'none'; // none, sent, received, friend
   StreamSubscription? _rematchSub;
-  StreamSubscription? _newMatchSub;
 
   @override
   void initState() {
@@ -829,27 +878,11 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
         }
       }
     });
-
-    // Yeni maç oluşturulursa (rakip kabul ettiyse) otomatik geçiş
-    _newMatchSub = FirebaseDatabase.instance
-        .ref('matches/${widget.matchId}/rematchMatchId')
-        .onValue
-        .listen((event) {
-      if (event.snapshot.value == null || !mounted) return;
-      final newMatchId = event.snapshot.value.toString();
-      _rematchSub?.cancel();
-      _newMatchSub?.cancel();
-      Navigator.of(context).pop(); // dialog
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => OnlineGameScreen(matchId: newMatchId)),
-      );
-    });
   }
 
   @override
   void dispose() {
     _rematchSub?.cancel();
-    _newMatchSub?.cancel();
     super.dispose();
   }
 
@@ -1021,11 +1054,23 @@ class _OnlineResultCardState extends State<_OnlineResultCard> {
                         Expanded(child: _playerStat(_l10n.t('you'), '$myGuesses ${_l10n.t('guessCount')}',
                             myData?.solved == true, const Color(0xFF2196F3))),
                         Container(width: 1, height: 44, color: context.wearth.glassBorder),
-                        Expanded(child: _playerStat(
-                            widget.opponentName.isNotEmpty ? widget.opponentName : _l10n.t('opponent'),
-                            '${widget.opponentGuessCount} ${_l10n.t('guessCount')}',
-                             widget.matchData.players.entries.where((e) => e.key != widget.myUid).firstOrNull?.value.solved == true,
-                            const Color(0xFFEF4444))),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final opponentUid = widget.matchData.players.entries
+                                  .firstWhere((e) => e.key != widget.myUid).key;
+                              final profile = await SocialService().getUserProfile(opponentUid);
+                              if (profile != null && mounted) {
+                                ProfileCard.show(context, profile);
+                              }
+                            },
+                            child: _playerStat(
+                                widget.opponentName.isNotEmpty ? widget.opponentName : _l10n.t('opponent'),
+                                '${widget.opponentGuessCount} ${_l10n.t('guessCount')}',
+                                 widget.matchData.players.entries.where((e) => e.key != widget.myUid).firstOrNull?.value.solved == true,
+                                const Color(0xFFEF4444)),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),

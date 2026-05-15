@@ -23,6 +23,7 @@ class AuthService {
   );
 
   User? get currentUser => _auth.currentUser;
+  String? get currentUid => currentUser?.uid;
   bool get isLoggedIn => currentUser != null;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 

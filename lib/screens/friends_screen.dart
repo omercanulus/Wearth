@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/social_service.dart';
+import '../services/matchmaking_service.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'online_matchmaking_screen.dart';
+import '../widgets/profile_card.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -348,7 +351,9 @@ class _UserTile extends StatefulWidget {
 
 class _UserTileState extends State<_UserTile> {
   final SocialService _socialService = SocialService();
+  final MatchmakingService _matchmakingService = MatchmakingService();
   String _relationshipStatus = 'none';
+  bool _isChallenging = false;
 
   @override
   void initState() {
@@ -374,22 +379,59 @@ class _UserTileState extends State<_UserTile> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFF3B82F6).withAlpha(20),
-            child: Text(widget.user.username[0].toUpperCase(), 
-                style: GoogleFonts.outfit(color: const Color(0xFF3B82F6), fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              widget.user.username,
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: context.wearth.textPrimary),
+          GestureDetector(
+            onTap: () => ProfileCard.show(context, widget.user),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF3B82F6).withAlpha(20),
+                  child: Text(widget.user.username[0].toUpperCase(), 
+                      style: GoogleFonts.outfit(color: const Color(0xFF3B82F6), fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.user.username,
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: context.wearth.textPrimary),
+                ),
+              ],
             ),
           ),
+          const Spacer(),
           if (widget.isFriend)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _actionButton(
+                  _isChallenging ? Icons.hourglass_empty_rounded : Icons.play_arrow_rounded, 
+                  Colors.blueAccent, 
+                  _isChallenging ? () {} : () async {
+                    setState(() => _isChallenging = true);
+                    try {
+                      final matchId = await _matchmakingService.challengeFriend(
+                        widget.user.uid, 
+                        widget.user.username
+                      );
+                      if (mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => OnlineMatchmakingScreen(matchId: matchId),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Hata: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isChallenging = false);
+                    }
+                  },
+                  label: 'Oyna',
+                ),
+                const SizedBox(width: 8),
                 _actionButton(Icons.block_flipped, Colors.orangeAccent, () async {
                   final confirmed = await _showConfirmDialog(
                     context, 

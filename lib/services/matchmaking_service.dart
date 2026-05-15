@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'word_service.dart';
 import '../l10n/app_localizations.dart';
 
@@ -250,6 +251,47 @@ class MatchmakingService {
     _currentMatchId = matchId;
   }
 
+  /// Belirli bir maçın detaylarını tek seferlik getirir.
+  Future<MatchData?> getMatchDetails(String matchId) async {
+    try {
+      final snapshot = await _db.ref('matches/$matchId').get().timeout(const Duration(seconds: 5));
+      if (!snapshot.exists || snapshot.value == null) return null;
+      
+      return MatchData.fromJson(
+        matchId, 
+        Map<String, dynamic>.from(snapshot.value as Map)
+      );
+    } catch (e) {
+      debugPrint('Maç detayı getirme hatası: $e');
+      return null;
+    }
+  }
+
+  /// Kullanıcının maç geçmişini getirir.
+  Future<List<Map<String, dynamic>>> getMatchHistory() async {
+    final user = _currentUser;
+    if (user == null) return [];
+
+    try {
+      final snapshot = await _db.ref('users/${user.uid}/history')
+          .orderByChild('timestamp')
+          .limitToLast(20)
+          .get();
+      
+      if (!snapshot.exists || snapshot.value == null) return [];
+
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      final list = data.values.map((v) => Map<String, dynamic>.from(v as Map)).toList();
+      
+      // En yeni en üstte olacak şekilde sırala
+      list.sort((a, b) => (b['timestamp'] as int? ?? 0).compareTo(a['timestamp'] as int? ?? 0));
+      return list;
+    } catch (e) {
+      debugPrint('Geçmiş getirme hatası: $e');
+      return [];
+    }
+  }
+
   // ─── Maçı Dinleme (Realtime) ───────────────────────────────────
 
   /// Maç verilerini gerçek zamanlı dinler.
@@ -316,8 +358,21 @@ class MatchmakingService {
             'winnerId': user.uid,
             'status': 'finished',
           });
+          // Geçmişe kaydet
+          final playerIds = (data['players'] as Map).keys.cast<String>().toList();
+          _saveMatchToHistory(matchId, playerIds);
         }
       }
+    }
+  }
+
+  /// Maç ID'lerini oyuncuların geçmişine kaydeder.
+  Future<void> _saveMatchToHistory(String matchId, List<String> playerIds) async {
+    for (final uid in playerIds) {
+      await _db.ref('users/$uid/history').push().set({
+        'matchId': matchId,
+        'timestamp': ServerValue.timestamp,
+      });
     }
   }
 
@@ -359,18 +414,21 @@ class MatchmakingService {
         'winnerId': solvedPlayerId, // null olabilir (berabere)
         'status': 'finished',
       });
+      // Geçmişe kaydet
+      _saveMatchToHistory(matchId, players.keys.cast<String>().toList());
     }
   }
 
   // ─── Maçtan Ayrılma ────────────────────────────────────────────
 
   /// Maçtan ayrılır ve temizlik yapar.
-  Future<void> leaveMatch() async {
-    if (_currentMatchId == null) return;
+  Future<void> leaveMatch({String? matchId}) async {
+    final targetMatchId = matchId ?? _currentMatchId;
+    if (targetMatchId == null) return;
 
     final user = _currentUser;
     if (user != null) {
-      final matchRef = _db.ref('matches/$_currentMatchId');
+      final matchRef = _db.ref('matches/$targetMatchId');
       final snapshot = await matchRef.get();
 
       if (snapshot.exists) {
@@ -378,10 +436,8 @@ class MatchmakingService {
         final status = data['status'] as String?;
 
         if (status == 'waiting') {
-          // Beklemedeyse maçı tamamen sil
           await matchRef.remove();
         } else if (status == 'playing') {
-          // Oyun sırasında ayrıldıysa, rakip kazanır
           final players = data['players'] as Map<dynamic, dynamic>;
           final opponentId = players.keys
               .firstWhere((k) => k.toString() != user.uid,
@@ -393,14 +449,17 @@ class MatchmakingService {
               'winnerId': opponentId,
               'status': 'finished',
             });
+            await _saveMatchToHistory(targetMatchId, [user.uid, opponentId]);
           }
         }
       }
     }
 
-    _matchSubscription?.cancel();
-    _matchSubscription = null;
-    _currentMatchId = null;
+    if (targetMatchId == _currentMatchId) {
+      _matchSubscription?.cancel();
+      _matchSubscription = null;
+      _currentMatchId = null;
+    }
   }
 
   /// Tüm dinleyicileri temizler.
@@ -437,6 +496,13 @@ class MatchmakingService {
     });
 
     return controller.stream;
+  }
+
+  /// Rematch sonucu oluşan yeni maç ID'sini dinler.
+  Stream<String?> listenForRematchMatchId(String matchId) {
+    return _db.ref('matches/$matchId/rematchMatchId').onValue.map((event) {
+      return event.snapshot.value?.toString();
+    });
   }
 
   /// Rematch kabul eder — yeni bir maç oluşturur ve iki oyuncuyu ekler.
@@ -489,5 +555,89 @@ class MatchmakingService {
 
     _currentMatchId = matchId;
     return matchId;
+  }
+
+  // ─── Arkadaşa Meydan Okuma (Direct Invite) ────────────────────
+
+  /// Bir arkadaşa doğrudan oyun isteği gönderir.
+  Future<String> challengeFriend(String friendUid, String friendName) async {
+    final user = _currentUser;
+    if (user == null) throw Exception('Giriş yapmanız gerekiyor');
+
+    final locale = AppLocalizations().currentLocale;
+    
+    // 1. Bekleyen bir maç oluştur
+    final words = _wordService.getSolutionWords(locale);
+    final randomWord = words[Random().nextInt(words.length)];
+
+    final matchRef = _db.ref('matches').push();
+    final matchId = matchRef.key!;
+
+    final myName = user.displayName ?? user.email?.split('@')[0] ?? 'Anonim';
+
+    debugPrint('🔵 Challenge gönderiliyor: $matchId, Hedef: $friendUid');
+
+    final matchData = {
+      'mode': 'challenge',
+      'maxPlayers': 2,
+      'word': randomWord,
+      'round': 1,
+      'status': 'waiting',
+      'locale': locale,
+      'createdAt': ServerValue.timestamp,
+      'players': {
+        user.uid: {
+          'uid': user.uid,
+          'name': myName,
+          'guesses': [],
+          'solved': false,
+          'score': 0,
+        },
+      },
+    };
+
+    await matchRef.set(matchData);
+
+    // 2. Arkadaşa davet gönder
+    await _db.ref('users/$friendUid/game_invites/${user.uid}').set({
+      'matchId': matchId,
+      'challengerName': myName,
+      'createdAt': ServerValue.timestamp,
+    });
+
+    _currentMatchId = matchId;
+    return matchId;
+  }
+
+  /// Gelen oyun davetlerini dinler.
+  Stream<Map<String, dynamic>?> listenToGameInvites() {
+    final user = _currentUser;
+    if (user == null) return Stream.value(null);
+
+    return _db.ref('users/${user.uid}/game_invites').onValue.map((event) {
+      if (event.snapshot.value == null) return null;
+      return Map<String, dynamic>.from(event.snapshot.value as Map);
+    });
+  }
+
+  /// Oyun davetine yanıt verir.
+  Future<void> respondToGameInvite({
+    required String challengerUid,
+    required String matchId,
+    required bool accept,
+  }) async {
+    final user = _currentUser;
+    if (user == null) return;
+
+    if (accept) {
+      // Maça katıl
+      await _joinMatch(matchId, user);
+    } else {
+      // Maçı ve daveti sil
+      await _db.ref('matches/$matchId').remove();
+    }
+
+    // Daveti her durumda sil
+    await _db.ref('users/${user.uid}/game_invites/$challengerUid').remove();
   }
 }

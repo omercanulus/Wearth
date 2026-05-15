@@ -9,6 +9,10 @@ import '../data/world_data.dart';
 import '../models/continent.dart';
 import '../services/life_service.dart';
 import 'classic_game_screen.dart';
+import '../services/social_service.dart';
+import 'friends_screen.dart';
+import '../widgets/profile_card.dart';
+import 'dart:async';
 
 class ClassicMapScreen extends StatefulWidget {
   const ClassicMapScreen({super.key});
@@ -22,6 +26,8 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
   final StorageService _storage = StorageService();
   int _currentLevel = 10;
   bool _isLoading = true;
+  List<UserProfile> _friends = [];
+  StreamSubscription? _friendsSubscription;
   late Continent _visibleContinent;
   final ScrollController _scrollController = ScrollController();
 
@@ -30,6 +36,15 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
     super.initState();
     _visibleContinent = WorldData.continents.first;
     _loadProgress();
+    _listenToFriends();
+  }
+
+  void _listenToFriends() {
+    _friendsSubscription = SocialService().listenFriends().listen((friends) {
+      if (mounted) {
+        setState(() => _friends = friends);
+      }
+    });
   }
 
   Future<void> _loadProgress() async {
@@ -39,6 +54,9 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
       _visibleContinent = WorldData.getContinentForLevel(_currentLevel);
       _isLoading = false;
     });
+
+    // Firebase ile senkronize et
+    SocialService().updateClassicLevel(level);
     
     // Yükleme bittikten sonra haritayı mevcut seviyeye kaydır
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -49,6 +67,7 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _friendsSubscription?.cancel();
     super.dispose();
   }
 
@@ -96,6 +115,162 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
   double _getItemHeight(int level) {
     if (level % 10 == 0) return 220.0; // Milestone every 10 levels
     return 140.0;
+  }
+
+  void _showFriendsBottomSheet(bool isLight) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.2,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isLight ? Colors.white : const Color(0xFF1F1A1B),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(50),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isLight ? Colors.black12 : Colors.white12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'ARKADAŞLARIN',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        color: isLight ? Colors.black87 : Colors.white,
+                      ),
+                    ),
+                    _buildCircleBtn(Icons.person_add_alt_1_rounded, () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FriendsScreen()),
+                      );
+                    }, isLight),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _friends.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Henüz arkadaşın yok.',
+                          style: GoogleFonts.outfit(color: isLight ? Colors.black38 : Colors.white38),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _friends.length,
+                        itemBuilder: (context, index) {
+                          final friend = _friends[index];
+                          return GestureDetector(
+                            onTap: () => ProfileCard.show(context, friend),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isLight ? Colors.black.withAlpha(5) : Colors.white.withAlpha(5),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: isLight ? Colors.black.withAlpha(10) : Colors.white.withAlpha(10)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.primaries[friend.uid.hashCode % Colors.primaries.length],
+                                          Colors.primaries[(friend.uid.hashCode + 1) % Colors.primaries.length],
+                                        ],
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        friend.username[0].toUpperCase(),
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          friend.username,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: isLight ? Colors.black87 : Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Seviye ${friend.classicLevel}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13,
+                                            color: isLight ? Colors.black54 : Colors.white54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3B82F6).withAlpha(20),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${friend.classicLevel}. LVL',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF3B82F6),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -193,22 +368,31 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
                           child: Center(
                             child: Transform.translate(
                               offset: Offset(currentOffsetX, 0),
-                              child: GestureDetector(
-                                onTap: isLocked ? null : () {
-                                  if (LifeService().lives <= 0) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('${_l10n.t("noLives")} ${LifeService().formattedTimeUntilNext} ${_l10n.t("wait")}')),
-                                    );
-                                    return;
-                                  }
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ClassicGameScreen(level: level),
-                                    ),
-                                  ).then((_) => _loadProgress());
-                                },
-                                child: _buildNode(level, isCompleted, isCurrent, isLocked, isLight),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  GestureDetector(
+                                    onTap: isLocked ? null : () {
+                                      if (LifeService().lives <= 0) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('${_l10n.t("noLives")} ${LifeService().formattedTimeUntilNext} ${_l10n.t("wait")}')),
+                                        );
+                                        return;
+                                      }
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ClassicGameScreen(level: level),
+                                        ),
+                                      ).then((_) => _loadProgress());
+                                    },
+                                    child: _buildNode(level, isCompleted, isCurrent, isLocked, isLight),
+                                  ),
+                                  
+                                  // Arkadaşların avatarlarını göster
+                                  ..._buildFriendAvatars(level, isLight),
+                                ],
                               ),
                             ),
                           ),
@@ -261,7 +445,7 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
                   children: [
                     _buildCircleBtn(Icons.storefront_rounded, () {}, isLight),
                     const SizedBox(width: 12),
-                    _buildCircleBtn(Icons.people_alt_outlined, () {}, isLight),
+                    _buildCircleBtn(Icons.people_alt_outlined, () => _showFriendsBottomSheet(isLight), isLight),
                   ],
                 ),
                 _buildLargeMapBtn(isLight, _scrollToCurrentLevel),
@@ -298,6 +482,43 @@ class _ClassicMapScreenState extends State<ClassicMapScreen> {
         ],
       ),
     );
+  }
+  List<Widget> _buildFriendAvatars(int level, bool isLight) {
+    final friendsAtThisLevel = _friends.where((f) => f.classicLevel == level).toList();
+    if (friendsAtThisLevel.isEmpty) return [];
+
+    return [
+      Positioned(
+        right: -30,
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Stack(
+            children: List.generate(friendsAtThisLevel.length.clamp(0, 3), (i) {
+              final friend = friendsAtThisLevel[i];
+              return Positioned(
+                left: i * 8.0,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    color: Colors.primaries[friend.uid.hashCode % Colors.primaries.length],
+                  ),
+                  child: Center(
+                    child: Text(
+                      friend.username[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      )
+    ];
   }
 
   Widget _buildNode(int level, bool isCompleted, bool isCurrent, bool isLocked, bool isLight) {
